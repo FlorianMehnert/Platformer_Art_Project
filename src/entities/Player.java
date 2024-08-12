@@ -25,13 +25,20 @@ import utilz.LoadSave;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.lwjgl.glfw.GLFW;
+
 
 
 public class Player extends Entity {
 
     private BufferedImage[][] animations;
+
+    // component design pattern
+    private List<Component> components;
+    private InputHandler inputHandler;
 
     // lvl layout
     private int[][] lvlData;
@@ -166,6 +173,30 @@ public class Player extends Entity {
             buttonStates[i] = GLFW.GLFW_RELEASE;
             prevButtonStates[i] = GLFW.GLFW_RELEASE;
         }
+
+        components = new ArrayList<>();
+        HealthComponent healthComponent = new HealthComponent();
+        MovementComponent movementComponent = new MovementComponent(playing, lvlData);
+        AnimationComponent animationComponent = new AnimationComponent();
+
+        components.add(healthComponent);
+        components.add(movementComponent);
+        components.add(animationComponent);
+
+        inputHandler = new InputHandler(movementComponent);
+    }
+
+    /**
+     * update components
+     */
+    public void updateComponents() {
+        for (Component component : components) {
+            component.update();
+        }
+    }
+
+    public void handleInput(String input) {
+        inputHandler.handleInput(input);
     }
 
     public void setSpawn(Point spawn) {
@@ -321,7 +352,7 @@ public class Player extends Entity {
      * <p>
      * 2.
      */
-    private void updatePos() {
+    protected void updatePos() {
 
         // working fine for keyboard
         if (jumpRequest) {
