@@ -37,8 +37,9 @@ public class Player extends Entity {
     private BufferedImage[][] animations;
 
     // component design pattern
-    private List<Component> components;
-    private InputHandler inputHandler;
+    private final List<Component> components;
+    private final InputHandler inputHandler;
+    private MovementComponent movementComponent;
 
     // lvl layout
     private int[][] lvlData;
@@ -92,7 +93,6 @@ public class Player extends Entity {
     private int pauseControllerState = GLFW.GLFW_RELEASE;
     private int dashControllerState = GLFW.GLFW_RELEASE;
     private boolean keyboardRotatedTile = false;
-
     // player control
 
     private boolean attacking = false;
@@ -173,11 +173,13 @@ public class Player extends Entity {
             buttonStates[i] = GLFW.GLFW_RELEASE;
             prevButtonStates[i] = GLFW.GLFW_RELEASE;
         }
-
         components = new ArrayList<>();
+
         HealthComponent healthComponent = new HealthComponent();
-        MovementComponent movementComponent = new MovementComponent(playing, lvlData);
         AnimationComponent animationComponent = new AnimationComponent();
+
+        movementComponent = new MovementComponent(playing, lvlData);
+        components.add(movementComponent);
 
         components.add(healthComponent);
         components.add(movementComponent);
@@ -195,8 +197,8 @@ public class Player extends Entity {
         }
     }
 
-    public void handleInput(String input) {
-        inputHandler.handleInput(input);
+    public void handleInput(String input, boolean left, boolean right) {
+        inputHandler.handleInput(input, left, right);
     }
 
     public void setSpawn(Point spawn) {
@@ -282,49 +284,8 @@ public class Player extends Entity {
      * 7. check for environmental damage
      */
     public void update() {
-        if (playing.getLoading()) {
-            return;
-        }
-        updateHealthBar();
-        if (handleDeadBody()) {
-            return;
-        }
-
-        // store pre input airborne status
-        boolean startInAir = inAir;
-        updateControllerInputs();
-
-        updatePowerBar();
-        updateAttackBox();
-        updateGrabBox();
-
-        if (state == HIT) {
-            if (aniIndex <= GetSpriteAmount(state) - 3)
-                pushBack(pushBackDir, lvlData, 1.25f);
-            updatePushBackDrawOffset();
-        } else {
-            updatePos();
-        }
-
-        checkSpikesTouched();
-        checkInsideWater();
-        if (powerAttackActive) {
-            powerAttackTick++;
-            if (powerAttackTick >= 35) {
-                powerAttackTick = 0;
-                powerAttackActive = false;
-            }
-        }
-
-        if (attacking || powerAttackActive) {
-            checkAttack();
-        }
-
-        updateAnimationTick();
-        setAnimation();
-
-        if (!startInAir && inAir) {
-            startTimeInAir = playing.getGameTimeInSeconds(); // if air status changed in this update loop then start timer
+        for (Component component : components) {
+            component.update();
         }
     }
 
@@ -963,6 +924,7 @@ public class Player extends Entity {
 
     public void loadLvlData(int[][] lvlData) {
         this.lvlData = lvlData;
+        movementComponent.setLvlData(lvlData);
         if (!IsEntityOnFloor(hitbox, lvlData))
             inAir = true;
     }
