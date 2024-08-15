@@ -89,9 +89,6 @@ public class Player extends Entity {
     private int dashControllerState = GLFW.GLFW_RELEASE;
     private boolean keyboardRotatedTile = false;
 
-    // player control
-
-    private boolean attacking = false;
     /**
      * requesting to go left
      */
@@ -215,6 +212,10 @@ public class Player extends Entity {
         grabBox = new Rectangle2D.Float(x, y, (int) (width * Game.SCALE), (int) (height * Game.SCALE));
     }
 
+    /**
+     * manage player movement and animation if health <= 0
+     * @return true if dead, false if alive
+     */
     private boolean handleDeadBody() {
         if (currentHealth <= 0) {
             if (state != DEAD) {
@@ -260,49 +261,42 @@ public class Player extends Entity {
             return;
         }
 
-        System.out.println(this.inputs);
-
         updateHealthBar();
+
         if (handleDeadBody()) {
             return;
         }
 
         // store pre input airborne status
         boolean startInAir = inAir;
+
+        // handle controller inputs
         updateControllerInputs();
-
         updatePowerBar();
-        updateAttackBox();
-        updateGrabBox();
 
+        // TODO: maybe remove since attacking system is complicated
         if (state == HIT) {
-            if (aniIndex <= GetSpriteAmount(state) - 3)
-                pushBack(pushBackDir, lvlData, 1.25f);
-            updatePushBackDrawOffset();
+            handleHit();
         } else {
             updatePos();
+            checkSpikesTouched();
+            checkInsideWater();
         }
 
-        checkSpikesTouched();
-        checkInsideWater();
-        if (powerAttackActive) {
-            powerAttackTick++;
-            if (powerAttackTick >= 35) {
-                powerAttackTick = 0;
-                powerAttackActive = false;
-            }
-        }
-
-        if (attacking || powerAttackActive) {
-            checkAttack();
-        }
+        // TODO: enable check attack when fighting system is done correctly again
+        // checkAttack();
 
         updateAnimationTick();
         setAnimation();
 
-        if (!startInAir && inAir) {
-            startTimeInAir = playing.getGameTimeInSeconds(); // if air status changed in this update loop then start timer
-        }
+        updateAttackBox();
+        updateGrabBox();
+    }
+
+    private void handleHit(){
+        if (aniIndex <= GetSpriteAmount(state) - 3)
+            pushBack(pushBackDir, lvlData, 1.25f);
+        updatePushBackDrawOffset();
     }
 
     private void turnDirection(float speed) {
@@ -427,6 +421,10 @@ public class Player extends Entity {
         }
     }
 
+    /**
+     * check if controller still connected
+     * collect pressed buttons
+     */
     private void updateControllerInputs() {
         boolean controllerIsPresent = GLFW.glfwJoystickPresent(controllerID);
         if (controllerIsPresent) {
@@ -453,13 +451,14 @@ public class Player extends Entity {
 
             // jump
             if (buttonStates[CONTROLLER_A_BUTTON_ID] == GLFW.GLFW_PRESS) {
-                jumpRequest = true;
+                keypress(KeyEvent.VK_W);
             }
             if (buttonStates[CONTROLLER_A_BUTTON_ID] == GLFW.GLFW_RELEASE) {
-                jumpRequest = false;
+                keyrelease(KeyEvent.VK_W);
             }
 
-            // dash
+            // dash (dash if l button was pressed and released)
+            // TODO: add to keyboard queue
             int prevDashControllerState = dashControllerState;
             dashControllerState = buttons.get(CONTROLLER_L_BUTTON_ID);
             if (dashControllerState == GLFW.GLFW_RELEASE && prevDashControllerState == GLFW.GLFW_PRESS) {
@@ -623,6 +622,9 @@ public class Player extends Entity {
 
     }
 
+    /**
+     * recalculate health bar width
+     */
     private void updateHealthBar() {
         healthWidth = (int) ((currentHealth / (float) maxHealth) * healthBarWidth);
     }
@@ -773,7 +775,6 @@ public class Player extends Entity {
                     if (!IsFloor(hitbox, 0, lvlData))
                         inAir = true;
                 }
-                attacking = false;
                 attackChecked = false;
                 throwActive = false;
             }
@@ -1027,7 +1028,6 @@ public class Player extends Entity {
             isCarrying = null;
         }
         inAir = false;
-        attacking = false;
         airSpeed = 0f;
         state = IDLE;
         currentHealth = maxHealth;
