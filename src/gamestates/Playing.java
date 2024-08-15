@@ -83,10 +83,11 @@ public class Playing extends State implements Statemethods {
     public void keyPressed(int key) {
 
         switch (key) {
-            case KeyEvent.VK_W -> player1.setJumpRequest(true);
-            case KeyEvent.VK_A -> player1.setLeft(true);
-            case KeyEvent.VK_S -> player1.fastFall(true);
-            case KeyEvent.VK_D -> player1.setRight(true);
+            case KeyEvent.VK_W -> player1.keypress(KeyEvent.VK_W);
+            case KeyEvent.VK_A -> player1.keypress(KeyEvent.VK_A);
+            case KeyEvent.VK_S -> player1.keypress(KeyEvent.VK_S);
+            case KeyEvent.VK_D -> player1.keypress(KeyEvent.VK_D);
+
             case KeyEvent.VK_E -> player1.grabOrThrow();
             case KeyEvent.VK_R -> player1.rotateTile(true);
             case KeyEvent.VK_T -> this.objectManager.addExplosion((int) player1.getX(), (int) player1.getY(), 10, 10);
@@ -119,10 +120,11 @@ public class Playing extends State implements Statemethods {
 
     public void keyReleased(int key) {
         switch (key) {
-            case KeyEvent.VK_W -> player1.setJumpRequest(false);
-            case KeyEvent.VK_A -> player1.setLeft(false);
-            case KeyEvent.VK_S -> player1.fastFall(false);
-            case KeyEvent.VK_D -> player1.setRight(false);
+            case KeyEvent.VK_W -> player1.keyrelease(KeyEvent.VK_W);
+            case KeyEvent.VK_A -> player1.keyrelease(KeyEvent.VK_A);
+            case KeyEvent.VK_S -> player1.keyrelease(KeyEvent.VK_S);
+            case KeyEvent.VK_D -> player1.keyrelease(KeyEvent.VK_D);
+
             case KeyEvent.VK_E -> player1.setGrabOrThrow(false);
             case KeyEvent.VK_R -> player1.rotateTile(false);
             case KeyEvent.VK_SHIFT -> player2.rotateTile(false);

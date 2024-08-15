@@ -16,6 +16,7 @@ import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
@@ -25,6 +26,8 @@ import utilz.LoadSave;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -145,6 +148,8 @@ public class Player extends Entity {
 
     private final boolean isPlayer1;
 
+    Queue<String> inputs = new LinkedList<>();
+
     public Player(float x, float y, int width, int height, Playing playing, boolean isPlayer1) {
         super(x, y, width, height);
         this.isPlayer1 = isPlayer1;
@@ -254,6 +259,9 @@ public class Player extends Entity {
         if (playing.getLoading()) {
             return;
         }
+
+        System.out.println(this.inputs);
+
         updateHealthBar();
         if (handleDeadBody()) {
             return;
@@ -1046,6 +1054,27 @@ public class Player extends Entity {
             changePower(-60);
         }
 
+    }
+
+    /**
+     * on event add the current key to the own input queue
+     */
+    public void keypress(int key){
+        switch (key){
+            case KeyEvent.VK_W -> inputs.add("JUMP");
+            case KeyEvent.VK_S -> inputs.add("FASTFALL");
+            case KeyEvent.VK_A -> inputs.add("MOVELEFT");
+            case KeyEvent.VK_D -> inputs.add("MOVERIGHT");
+        }
+    }
+
+    public void keyrelease(int key){
+        switch (key){
+            case KeyEvent.VK_W -> inputs.add("R_JUMP");
+            case KeyEvent.VK_S -> inputs.add("R_FASTFALL");
+            case KeyEvent.VK_A -> inputs.add("R_MOVELEFT");
+            case KeyEvent.VK_D -> inputs.add("R_MOVERIGHT");
+        }
     }
 
     public int getXLvlOffset() {
