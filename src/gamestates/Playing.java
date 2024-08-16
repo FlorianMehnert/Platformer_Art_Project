@@ -75,10 +75,6 @@ public class Playing extends State implements Statemethods {
 
     }
 
-    private void becomeOP(Player player) {
-        player.powerAttack();
-        player.changePower(200);
-    }
 
     public void keyPressed(int key) {
 
@@ -97,7 +93,6 @@ public class Playing extends State implements Statemethods {
             case KeyEvent.VK_K -> player1.changeThrowDirectionKeyboardDown();
             case KeyEvent.VK_I -> player1.changeThrowDirectionKeyboardUp();
 
-            case KeyEvent.VK_CIRCUMFLEX -> becomeOP(player1);
 
             case KeyEvent.VK_UP -> player2.keypress(KeyEvent.VK_W);
             case KeyEvent.VK_LEFT -> player2.setLeft(true);
@@ -109,7 +104,6 @@ public class Playing extends State implements Statemethods {
             case KeyEvent.VK_NUMPAD6 -> player2.changeThrowDirectionKeyboardRight();
             case KeyEvent.VK_NUMPAD8 -> player2.changeThrowDirectionKeyboardUp();
             case KeyEvent.VK_SHIFT -> player2.rotateTile(true);
-            case KeyEvent.VK_NUMPAD0 -> becomeOP(player2);
             case KeyEvent.VK_SPACE -> this.setLoading(false);
             case KeyEvent.VK_ESCAPE -> {
                 Gamestate.state = Gamestate.MENU;
@@ -122,9 +116,11 @@ public class Playing extends State implements Statemethods {
     public void keyReleased(int key) {
         switch (key) {
             case KeyEvent.VK_W -> player1.keyrelease(KeyEvent.VK_W);
-            case KeyEvent.VK_A -> player1.keyrelease(KeyEvent.VK_A);
+            case KeyEvent.VK_A -> {player1.keyrelease(KeyEvent.VK_A);
+                System.out.println("release left");}
             case KeyEvent.VK_S -> player1.keyrelease(KeyEvent.VK_S);
-            case KeyEvent.VK_D -> player1.keyrelease(KeyEvent.VK_D);
+            case KeyEvent.VK_D -> {player1.keyrelease(KeyEvent.VK_D);
+                System.out.println("release right");}
 
             case KeyEvent.VK_E -> player1.setGrabOrThrow(false);
             case KeyEvent.VK_R -> player1.rotateTile(false);

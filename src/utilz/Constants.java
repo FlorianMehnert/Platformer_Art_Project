@@ -191,14 +191,26 @@ public class Constants {
         public static final int PLAYER_BASE_WIDTH = 64;
 
         public static final int IDLE = 0;
+        public static final int STOP = 0;
+
         public static final int RUNNING = 1;
+        public static final int NORMAL_JUMP = 1;
+        public static final int NORMAL_LEFT = 1;
+        public static final int NORMAL_RIGHT = 1;
+
         public static final int JUMP = 2;
+        public static final int DOUBLE_JUMP = 2;
+        public static final int DOUBLE_LEFT = 2;
+        public static final int DOUBLE_RIGHT = 2;
         public static final int FALLING = 3;
         public static final int ATTACK = 4;
         public static final int HIT = 5;
         public static final int DEAD = 6;
         public static final int THROW = 7;
-        public static final int FASTFALLING = 8;
+        public static final int FAST_FALLING = 8;
+
+
+
 
         public static final int NUM_ANIMATIONS = 9;
         public static final int MAX_ANIMATION_LENGTH = 12;
@@ -212,7 +224,7 @@ public class Constants {
                 case JUMP -> 5;
                 case ATTACK -> 5;
                 case FALLING -> 4;
-                case FASTFALLING -> 4;
+                case FAST_FALLING -> 4;
                 case THROW -> 4;
                 default -> 1;
             };

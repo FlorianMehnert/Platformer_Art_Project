@@ -301,6 +301,7 @@ public class Player extends Entity {
                 updatePos();
 
             } catch (CommandNotRegistered ignored) {
+                System.out.println("command not registered");
             }
             checkSpikesTouched();
             checkInsideWater();
@@ -340,54 +341,24 @@ public class Player extends Entity {
 
         // reset count map
         countMap.replaceAll((c, v) -> 0);
+        if (!inputs.isEmpty()){
+            System.out.println("inputs are not empty");
+        }
+        for (String element : inputs) {
+            System.out.println(element);
+        }
         updateCountMap();
 
         // JUMP
         // TODO: add COYOTE TIME back in
         switch (resultingAction("JUMP")) {
-            case 1 -> airSpeed = inAir ? airSpeed : -jumpSpeed;
-            case 2 -> airSpeed = inAir ? jumpSpeed * 4 : jumpSpeed;
+            case NORMAL_JUMP -> airSpeed = inAir ? airSpeed : -jumpSpeed;
+            case DOUBLE_JUMP -> airSpeed = inAir ? jumpSpeed * 4 : jumpSpeed;
         }
 
+        Direction direction = determineDirection(countMap.get("MOVELEFT"), countMap.get("MOVERIGHT"));
 
-        // determine direction
-        int left = countMap.get("MOVELEFT");
-        int right = countMap.get("MOVERIGHT");
-        boolean isLeft;
-        if (left > right && left != 0) {
-            isLeft = true;
-        } else if (right > left && right != 0) {
-            isLeft = false;
-        } else {
-            return;
-        }
-
-        if (isLeft) {
-            switch (resultingAction("MOVELEFT")) {
-                case 0 -> xSpeed = 0;
-                case 1 -> {
-                    xSpeed = inAir ? xSpeed : -walkSpeed;
-                    turnDirection(true);
-                }   // TODO: decide on whether to move in the air
-                case 2 -> {
-                    xSpeed = inAir ? -walkSpeed * 4 : -walkSpeed;
-                    turnDirection(true);
-                }   // TODO: incorporate better dash method lol
-            }
-
-        } else {
-            switch (resultingAction("MOVERIGHT")) {
-                case 0 -> xSpeed = 0;
-                case 1 -> {
-                    xSpeed = inAir ? xSpeed : walkSpeed;
-                    turnDirection(false);
-                }
-                case 2 -> {
-                    xSpeed = inAir ? xSpeed * 4 : walkSpeed;
-                    turnDirection(false);
-                }
-            }
-        }
+        if (direction != null) {xSpeed = determineSpeed(direction);}
 
         // check if entity is airborne
         if (!inAir)
@@ -395,32 +366,83 @@ public class Player extends Entity {
                 inAir = true;
 
         // lookahead collision check
+        float[] speed = applySpeed(xSpeed, airSpeed);
+        xSpeed = speed[0];
+        airSpeed = speed[1];
+
+
+        this.inputs.clear();
+    }
+
+    /**
+     * determine direction based on inputs
+     * @return resulting direction
+     */
+    public Direction determineDirection(int left, int right){
+        Direction dir = null;
+        if (left > right && left != 0) {
+            dir = Direction.LEFT;
+        } else if (right > left && right != 0) {
+            dir = Direction.RIGHT;
+        }
+        return dir;
+    }
+
+    /**
+     * based on direction and inputs set speed
+     * @param dir direction: either LEFT or RIGHT
+     * @return resulting speed
+     * @throws CommandNotRegistered throws if command string is not registered
+     */
+    private float determineSpeed(Direction dir) throws CommandNotRegistered {
+        float speed = 0;
+        if (dir == Direction.LEFT) {
+            switch (resultingAction("MOVELEFT")) {
+                case NORMAL_LEFT -> {speed = -walkSpeed; turnDirection(true);}
+                case DOUBLE_LEFT -> {speed = inAir ? -walkSpeed * 4 : -walkSpeed; turnDirection(true);
+                }
+            }
+        } else if (dir == Direction.RIGHT) {
+            switch (resultingAction("MOVERIGHT")) {
+                case NORMAL_RIGHT -> {speed = walkSpeed; turnDirection(false);}
+                case DOUBLE_RIGHT -> {speed = inAir ? walkSpeed * 4 : walkSpeed;turnDirection(false);}
+            }
+        }
+        return speed;
+    }
+
+    /**
+     * updated the position of the player using the given x and y speed
+     * @param dx x speed
+     * @param dy y speed
+     * @return float array size 2 with updated x and y speed
+     */
+    public float[] applySpeed(float dx, float dy) {
         if (inAir) {
-            if (CanMoveHere(hitbox.x, hitbox.y + airSpeed, hitbox.width, hitbox.height, lvlData)) {
-                hitbox.y += airSpeed;
-                airSpeed += GRAVITY;
-                updateXPos(xSpeed, lvlData);
+            if (CanMoveHere(hitbox.x, hitbox.y + dy, hitbox.width, hitbox.height, lvlData)) {
+                hitbox.y += dy;
+                dx += GRAVITY;
+                updateXPos(dx, lvlData);
             } else {
                 float fallSpeedAfterCollision = 0.5f * Game.SCALE;
-                if (airSpeed > 0)
+                if (dy > 0)
                     resetInAir();
                 else
-                    airSpeed = fallSpeedAfterCollision;
+                    dy = fallSpeedAfterCollision;
                 // TODO
-                updateXPos(xSpeed, lvlData);
+                updateXPos(dx, lvlData);
                 inAir = false;
             }
 
         } else {
             // execute x pos update
-            updateXPos(xSpeed, lvlData);
-            if (powerAttackActive && !CanMoveHere(hitbox.x + xSpeed, hitbox.y, hitbox.width, hitbox.height, lvlData)) {
+            updateXPos(dx, lvlData);
+            if (powerAttackActive && !CanMoveHere(hitbox.x + dx, hitbox.y, hitbox.width, hitbox.height, lvlData)) {
                 powerAttackActive = false;
                 powerAttackTick = 0;
             }
         }
-
-        this.inputs.clear();
+        return new float[]{dx, dy};
     }
 
     public void debugInputs(){
@@ -516,7 +538,7 @@ public class Player extends Entity {
             int prevDashControllerState = dashControllerState;
             dashControllerState = buttons.get(CONTROLLER_L_BUTTON_ID);
             if (dashControllerState == GLFW.GLFW_RELEASE && prevDashControllerState == GLFW.GLFW_PRESS) {
-                powerAttack();
+                // TODO: add different dash
             }
 
             // grab or throw
@@ -819,7 +841,7 @@ public class Player extends Entity {
             aniTick = 0;
             aniIndex++;
             if (aniIndex >= GetSpriteAmount(state)) {
-                if (state == JUMP || state == FALLING || state == FASTFALLING || state == ATTACK)
+                if (state == JUMP || state == FALLING || state == FAST_FALLING || state == ATTACK)
                     aniIndex--;
                 else
                     aniIndex = 0;
@@ -852,7 +874,7 @@ public class Player extends Entity {
             else if ((playing.getGameTimeInSeconds() - startTimeInAir) > 0.2f && !fasterFall) {
                 state = FALLING;
             } else if (((playing.getGameTimeInSeconds() - startTimeInAir) > 0.2f) && fasterFall) {
-                state = FASTFALLING;
+                state = FAST_FALLING;
             }
         }
 
@@ -940,7 +962,7 @@ public class Player extends Entity {
                 case RUNNING -> "running";
                 case JUMP, ATTACK -> "jump";
                 case FALLING -> "falling";
-                case FASTFALLING -> "fastfalling";
+                case FAST_FALLING -> "fastfalling";
                 case HIT -> "hit";
                 case DEAD -> "dead";
                 case THROW -> "throw";
@@ -963,7 +985,7 @@ public class Player extends Entity {
 
                     }
 
-                    if (j == IDLE || j == RUNNING || j == JUMP || j == FALLING || j == FASTFALLING || j == ATTACK) {
+                    if (j == IDLE || j == RUNNING || j == JUMP || j == FALLING || j == FAST_FALLING || j == ATTACK) {
                         // carry animations
                         if (Thread.currentThread().getContextClassLoader().getResource(baseDir + "/carry" + fileName + i + ".png") != null) {
                             animations[j + NUM_ANIMATIONS][i] = LoadSave.GetSpriteAtlas(baseDir + "/carry" + fileName + i + ".png");
@@ -1086,18 +1108,6 @@ public class Player extends Entity {
         throwWidthInSmallTiles = (float) TETRIS_TILE_MAX_THROW_WIDTH_IN_SMALL_TILES / 2;
         if (!IsEntityOnFloor(hitbox, lvlData))
             inAir = true;
-    }
-
-
-    public void powerAttack() {
-        selfHurt = false;
-        if (powerAttackActive)
-            return;
-        if (powerValue >= 60) {
-            powerAttackActive = true;
-            changePower(-60);
-        }
-
     }
 
     /**
