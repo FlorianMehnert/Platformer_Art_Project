@@ -1,36 +1,38 @@
 package entities;
 
-import static utilz.Constants.PlayerConstants.*;
-import static utilz.HelpMethods.*;
-import static utilz.Constants.UPS_SET;
-import static utilz.Constants.GRAVITY;
-import static utilz.Constants.ANI_SPEED;
-import static utilz.Constants.Directions.*;
-import static utilz.Constants.TetrisTileConstants.*;
-import static utilz.Constants.ControllerConstants.*;
-import static utilz.Constants.UI.*;
-import static utilz.Constants.Environment.*;
+import gamestates.Playing;
+import main.Game;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.lwjgl.glfw.GLFW;
+import utilz.LoadSave;
 
-import java.awt.BasicStroke;
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Point;
+import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-
-import gamestates.Playing;
-import main.Game;
-import utilz.LoadSave;
-
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Queue;
+import java.util.Map;
 
-import org.lwjgl.glfw.GLFW;
+import static utilz.Constants.*;
+import static utilz.Constants.ControllerConstants.*;
+import static utilz.Constants.Directions.*;
+import static utilz.Constants.Environment.*;
+import static utilz.Constants.PlayerConstants.*;
+import static utilz.Constants.TetrisTileConstants.*;
+import static utilz.Constants.UI.BACKGROUND_GREY;
+import static utilz.Constants.UI.BASE_GREY;
+import static utilz.HelpMethods.*;
 
+class CommandNotRegistered extends Exception {
+    public CommandNotRegistered(String s) {
+        super(s);
+    }
+}
 
 public class Player extends Entity {
 
@@ -122,7 +124,6 @@ public class Player extends Entity {
     /**
      * handle keyboard press/release cycle for double jump
      */
-    private boolean resetJump = true;
 
     /**
      * used to reset double dash counter on turning to the other side
@@ -145,7 +146,8 @@ public class Player extends Entity {
 
     private final boolean isPlayer1;
 
-    Queue<String> inputs = new LinkedList<>();
+    Deque<String> inputs = new LinkedList<>();
+    Map<String, Integer> countMap = new HashMap<>();
 
     public Player(float x, float y, int width, int height, Playing playing, boolean isPlayer1) {
         super(x, y, width, height);
@@ -168,6 +170,8 @@ public class Player extends Entity {
             buttonStates[i] = GLFW.GLFW_RELEASE;
             prevButtonStates[i] = GLFW.GLFW_RELEASE;
         }
+
+        initCountMap();
     }
 
     public void setSpawn(Point spawn) {
@@ -185,15 +189,15 @@ public class Player extends Entity {
         return this.y;
     }
 
-    public float getSpeedX(){
+    public float getSpeedX() {
         return this.xSpeed;
     }
 
-    public float getSpeedY(){
+    public float getSpeedY() {
         return this.airSpeed;
     }
 
-    public String getDashState(){
+    public String getDashState() {
         return switch (this.dashState) {
             case NOTHING -> "NOTHING";
             case ACTIVATE1 -> "ACTIVATE1";
@@ -212,8 +216,26 @@ public class Player extends Entity {
         grabBox = new Rectangle2D.Float(x, y, (int) (width * Game.SCALE), (int) (height * Game.SCALE));
     }
 
+    protected void initCountMap() {
+        countMap.put("JUMP", 0);
+        countMap.put("FASTFALL", 0);
+        countMap.put("MOVELEFT", 0);
+        countMap.put("MOVERIGHT", 0);
+        countMap.put("R_JUMP", 0);
+        countMap.put("R_FASTFALL", 0);
+        countMap.put("R_MOVELEFT", 0);
+        countMap.put("R_MOVERIGHT", 0);
+    }
+
+    protected void updateCountMap() {
+        for (String element : inputs) {
+            countMap.put(element, countMap.getOrDefault(element, 0) + 1);
+        }
+    }
+
     /**
      * manage player movement and animation if health <= 0
+     *
      * @return true if dead, false if alive
      */
     private boolean handleDeadBody() {
@@ -267,9 +289,6 @@ public class Player extends Entity {
             return;
         }
 
-        // store pre input airborne status
-        boolean startInAir = inAir;
-
         // handle controller inputs
         updateControllerInputs();
         updatePowerBar();
@@ -278,7 +297,11 @@ public class Player extends Entity {
         if (state == HIT) {
             handleHit();
         } else {
-            updatePos();
+            try {
+                updatePos();
+
+            } catch (CommandNotRegistered ignored) {
+            }
             checkSpikesTouched();
             checkInsideWater();
         }
@@ -293,100 +316,89 @@ public class Player extends Entity {
         updateGrabBox();
     }
 
-    private void handleHit(){
+    private void handleHit() {
         if (aniIndex <= GetSpriteAmount(state) - 3)
             pushBack(pushBackDir, lvlData, 1.25f);
         updatePushBackDrawOffset();
     }
 
-    private void turnDirection(float speed) {
-        if (left && !right) {
-            xSpeed = -speed;
+    private void turnDirection(boolean turnLeft) {
+        if (turnLeft) {
             flipX = width;
             flipW = -1;
-        }else if (right && !left){
-            xSpeed = speed;
+        } else {
             flipX = 0;
             flipW = 1;
-        }else {
-            if (dashState.equals(DashState.NOTHING)) {
-                xSpeed = 0;
-            }
         }
     }
 
     /**
-     * 1. check for input actions
-     * - jumping
-     * - fast fall
-     * - left, right
-     * <p>
-     * 2.
+     * look through all the key presses and key releases and derive actions
      */
-    private void updatePos() {
+    private void updatePos() throws CommandNotRegistered {
 
-        // working fine for keyboard
-        if (jumpRequest) {
-            // only apply jump once per button press - for keyboard
-            if (resetJump && jumpsDone < MAX_ALLOWED_JUMPS) {
-                // TODO: jump using qLERP
-                jump();
-                jumpsDone++;
-                resetJump = false;
-            } else {
-                jumpRequest = false;
-            }
+
+        // reset count map
+        countMap.replaceAll((c, v) -> 0);
+        updateCountMap();
+
+        // JUMP
+        // TODO: add COYOTE TIME back in
+        switch (resultingAction("JUMP")) {
+            case 1 -> airSpeed = inAir ? airSpeed : -jumpSpeed;
+            case 2 -> airSpeed = inAir ? jumpSpeed * 4 : jumpSpeed;
         }
 
-        // on the ground
-        if (!inAir) {
-            jumpsDone = 0;
-            resetJump = true;
-            xSpeed = 0;
-            dashState = DashState.NOTHING;
 
-            // stop movement if left and right pressed
-            if (!powerAttackActive)
-                if ((!left && !right) || (right && left))
-                    return;
+        // determine direction
+        int left = countMap.get("MOVELEFT");
+        int right = countMap.get("MOVERIGHT");
+        boolean isLeft;
+        if (left > right && left != 0) {
+            isLeft = true;
+        } else if (right > left && right != 0) {
+            isLeft = false;
+        } else {
+            return;
         }
 
-        // set  direction and animation
-        switch (dashState){
-            case NOTHING, ACTIVATE1, RELEASE1 -> {
-                turnDirection(walkSpeed);
+        if (isLeft) {
+            switch (resultingAction("MOVELEFT")) {
+                case 0 -> xSpeed = 0;
+                case 1 -> {
+                    xSpeed = inAir ? xSpeed : -walkSpeed;
+                    turnDirection(true);
+                }   // TODO: decide on whether to move in the air
+                case 2 -> {
+                    xSpeed = inAir ? -walkSpeed * 4 : -walkSpeed;
+                    turnDirection(true);
+                }   // TODO: incorporate better dash method lol
             }
-            case ACTIVATE2 -> {
-                dashStartTime = System.currentTimeMillis();
-                dashState = DashState.DASHING;
-            }
-            case DASHING -> {
-                turnDirection(walkSpeed*5);
-                if ((System.currentTimeMillis() - dashStartTime) >= 200) {
-                    dashState = DashState.NOTHING;
+
+        } else {
+            switch (resultingAction("MOVERIGHT")) {
+                case 0 -> xSpeed = 0;
+                case 1 -> {
+                    xSpeed = inAir ? xSpeed : walkSpeed;
+                    turnDirection(false);
+                }
+                case 2 -> {
+                    xSpeed = inAir ? xSpeed * 4 : walkSpeed;
+                    turnDirection(false);
                 }
             }
         }
 
-        if (powerAttackActive) {
-            if ((!left && !right) || (left && right)) {
-                if (flipW == -1)
-                    xSpeed = -walkSpeed;
-                else
-                    xSpeed = walkSpeed;
-            }
-            xSpeed *= 3;
-        }
-
+        // check if entity is airborne
         if (!inAir)
             if (!IsEntityOnFloor(hitbox, lvlData))
                 inAir = true;
 
-        // normal airborne
-        if (inAir && !powerAttackActive) {
+        // lookahead collision check
+        if (inAir) {
             if (CanMoveHere(hitbox.x, hitbox.y + airSpeed, hitbox.width, hitbox.height, lvlData)) {
                 hitbox.y += airSpeed;
-                airSpeed += GRAVITY * (isFastFall() ? 5 : 1);
+                airSpeed += GRAVITY;
                 updateXPos(xSpeed, lvlData);
             } else {
                 float fallSpeedAfterCollision = 0.5f * Game.SCALE;
@@ -396,6 +408,7 @@ public class Player extends Entity {
                     airSpeed = fallSpeedAfterCollision;
                 // TODO
                 updateXPos(xSpeed, lvlData);
+                inAir = false;
             }
 
         } else {
@@ -406,6 +419,47 @@ public class Player extends Entity {
                 powerAttackTick = 0;
             }
         }
+
+        this.inputs.clear();
+    }
+
+    public void debugInputs(){
+        System.out.println(inputs);
+        System.out.println(countMap);
+    }
+
+    /**
+     * enter command as string and get if either is normal action or double tap action
+     *
+     * @param command e.g. JUMP, MOVELEFT, MOVERIGHT, FASTFALL
+     * @return 0 if no action, 1 if normal action, 2 if double tap action
+     */
+    private int resultingAction(String command) throws CommandNotRegistered {
+        int pressed;
+        int released;
+        try {
+            pressed = countMap.get(command);
+        } catch (NullPointerException e) {
+            throw new CommandNotRegistered("command " + command + " not found");
+        }
+
+        try {
+            released = countMap.get("R_" + command);
+        } catch (NullPointerException e) {
+            throw new CommandNotRegistered("command " + "R_" + command + " not found");
+        }
+
+        if (pressed == 0) {
+            return 0;
+        } else if (pressed > 0 && released == 0) {
+            return 1;
+        } else {
+            return 2;
+        }
+    }
+
+    private Pair<Float, Float> calculateSpeed() {
+        return new ImmutablePair<>(0.0f, 0.0f);
     }
 
     private void jump() {
@@ -823,7 +877,6 @@ public class Player extends Entity {
     }
 
 
-
     private void resetInAir() {
         inAir = false;
         airSpeed = 0;
@@ -977,15 +1030,6 @@ public class Player extends Entity {
         }
     }
 
-    public void setJumpRequest(boolean jumpRequest) {
-        //this.jump = jump;
-        if (!jumpRequest && jumpsDone < MAX_ALLOWED_JUMPS) {
-            resetJump = true;
-        } else {
-            this.jumpRequest = true;
-        }
-    }
-
     public void fastFall(boolean doSpeedup) {
         this.fasterFall = doSpeedup;
     }
@@ -1059,21 +1103,38 @@ public class Player extends Entity {
     /**
      * on event add the current key to the own input queue
      */
-    public void keypress(int key){
-        switch (key){
-            case KeyEvent.VK_W -> inputs.add("JUMP");
-            case KeyEvent.VK_S -> inputs.add("FASTFALL");
-            case KeyEvent.VK_A -> inputs.add("MOVELEFT");
-            case KeyEvent.VK_D -> inputs.add("MOVERIGHT");
+    public void keypress(int key) {
+
+        switch (key) {
+            case KeyEvent.VK_W -> dequeueAdd("JUMP", inputs);
+            case KeyEvent.VK_S -> dequeueAdd("FASTFALL", inputs);
+            case KeyEvent.VK_A -> dequeueAdd("MOVELEFT", inputs);
+            case KeyEvent.VK_D -> dequeueAdd("MOVERIGHT", inputs);
         }
     }
 
-    public void keyrelease(int key){
-        switch (key){
-            case KeyEvent.VK_W -> inputs.add("R_JUMP");
-            case KeyEvent.VK_S -> inputs.add("R_FASTFALL");
-            case KeyEvent.VK_A -> inputs.add("R_MOVELEFT");
-            case KeyEvent.VK_D -> inputs.add("R_MOVERIGHT");
+    public void keyrelease(int key) {
+        switch (key) {
+            case KeyEvent.VK_W -> dequeueAdd("R_JUMP", inputs);
+            case KeyEvent.VK_S -> dequeueAdd("R_FASTFALL", inputs);
+            case KeyEvent.VK_A -> dequeueAdd("R_MOVELEFT", inputs);
+            case KeyEvent.VK_D -> dequeueAdd("R_MOVERIGHT", inputs);
+        }
+    }
+
+    /**
+     * add command that is not the same as the last queue item
+     *
+     * @param command defines the action that should be added to the input queue
+     */
+    public void dequeueAdd(String command, Deque<String> queue) {
+        if (queue.isEmpty()) {
+            queue.add(command);
+            return;
+        }
+
+        if (!queue.getLast().equals(command)) {
+            queue.add(command);
         }
     }
 

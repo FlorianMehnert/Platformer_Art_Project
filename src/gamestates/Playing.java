@@ -87,6 +87,7 @@ public class Playing extends State implements Statemethods {
             case KeyEvent.VK_A -> player1.keypress(KeyEvent.VK_A);
             case KeyEvent.VK_S -> player1.keypress(KeyEvent.VK_S);
             case KeyEvent.VK_D -> player1.keypress(KeyEvent.VK_D);
+            case KeyEvent.VK_X -> player1.debugInputs();
 
             case KeyEvent.VK_E -> player1.grabOrThrow();
             case KeyEvent.VK_R -> player1.rotateTile(true);
@@ -98,7 +99,7 @@ public class Playing extends State implements Statemethods {
 
             case KeyEvent.VK_CIRCUMFLEX -> becomeOP(player1);
 
-            case KeyEvent.VK_UP -> player2.setJumpRequest(true);
+            case KeyEvent.VK_UP -> player2.keypress(KeyEvent.VK_W);
             case KeyEvent.VK_LEFT -> player2.setLeft(true);
             case KeyEvent.VK_RIGHT -> player2.setRight(true);
             case KeyEvent.VK_DOWN -> player2.fastFall(true);
@@ -128,7 +129,7 @@ public class Playing extends State implements Statemethods {
             case KeyEvent.VK_E -> player1.setGrabOrThrow(false);
             case KeyEvent.VK_R -> player1.rotateTile(false);
             case KeyEvent.VK_SHIFT -> player2.rotateTile(false);
-            case KeyEvent.VK_UP -> player2.setJumpRequest(false);
+            case KeyEvent.VK_UP -> player2.keyrelease(KeyEvent.VK_W);
             case KeyEvent.VK_LEFT -> player2.setLeft(false);
             case KeyEvent.VK_RIGHT -> player2.setRight(false);
             case KeyEvent.VK_ENTER -> player2.setGrabOrThrow(false);
